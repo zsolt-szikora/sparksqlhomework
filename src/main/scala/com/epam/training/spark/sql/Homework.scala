@@ -58,69 +58,13 @@ object Homework {
 
   }
 
-  def readCsvData(sqlContext: HiveContext, rawDataPath: String): DataFrame = {
-    val df = sqlContext
-      .read
-      .option("header", "true")
-      .option("delimiter", ";")
-      .schema(Constants.CLIMATE_TYPE)
-      .csv(rawDataPath)
-    df.printSchema()
-    val a = df.collect()
-    print(a)
-    df
-  }
+  def readCsvData(sqlContext: HiveContext, rawDataPath: String): DataFrame = ???
 
-  def findErrors(climateDataFrame: DataFrame): Array[Row] = {
-    val isNull = udf((value: Any) => {
-      if (value == null) 1
-      else 0
-    })
+  def findErrors(climateDataFrame: DataFrame): Array[Row] = ???
 
-    climateDataFrame
-      .select(
-        isNull(col("observation_date")).as("observation_date"),
-        isNull(col("mean_temperature")).as("mean_temperature"),
-        isNull(col("max_temperature")).as("max_temperature"),
-        isNull(col("min_temperature")).as("min_temperature"),
-        isNull(col("precipitation_mm")).as("precipitation_mm"),
-        isNull(col("precipitation_type")).as("precipitation_type"),
-        isNull(col("sunshine_hours")).as("sunshine_hours")
-      )
-      .agg(
-        sum(col("observation_date")),
-        sum(col("mean_temperature")),
-        sum(col("max_temperature")),
-        sum(col("min_temperature")),
-        sum(col("precipitation_mm")),
-        sum(col("precipitation_type")),
-        sum(col("sunshine_hours"))
-      ).collect()
-  }
+  def averageTemperature(climateDataFrame: DataFrame, monthNumber: Int, dayOfMonth: Int): DataFrame = ???
 
-  def averageTemperature(climateDataFrame: DataFrame, monthNumber: Int, dayOfMonth: Int): DataFrame = {
-    val df = climateDataFrame
-      .withColumn("year", year(col("observation_date")))
-      .withColumn("month", month(col("observation_date")))
-      .withColumn("dayofmonth", dayofmonth(col("observation_date")))
-
-    df.printSchema()
-
-    df.where(col("month") === monthNumber && col("dayOfMonth") === dayOfMonth)
-    .select(col("mean_temperature"))
-  }
-
-  def predictTemperature(climateDataFrame: DataFrame, monthNumber: Int, dayOfMonth: Int): Double = {
-    val df = climateDataFrame
-      .withColumn("year", year(col("observation_date")))
-      .withColumn("month", month(col("observation_date")))
-      .withColumn("dayofmonth", dayofmonth(col("observation_date")))
-
-    df.printSchema()
-
-    df.where(col("month") === monthNumber && col("dayOfMonth").isin(dayOfMonth - 1, dayOfMonth, dayOfMonth + 1))
-    .agg(avg(col("mean_temperature"))).first().getDouble(0)
-  }
+  def predictTemperature(climateDataFrame: DataFrame, monthNumber: Int, dayOfMonth: Int): Double = ???
 
 
 }

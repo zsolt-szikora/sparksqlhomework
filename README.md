@@ -1,4 +1,4 @@
-# Spark Core homework
+# Spark SQL homework
 
 ## Setup
 
