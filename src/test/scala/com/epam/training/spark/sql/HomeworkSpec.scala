@@ -1,8 +1,9 @@
 package com.epam.training.spark.sql
 
 import com.epam.hubd.spark.scala.core.util.RddComparator
-import com.epam.training.spark.sql.domain.Climate
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.types._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FunSpec}
 
@@ -29,24 +30,45 @@ class HomeworkSpec extends FunSpec with BeforeAndAfterAll {
     List("2010-01-03", "-1.9", "0.2", "-2.6", "0.0", "4", "0.5")
   )
 
+  val CLIMATE_DATAFRAME = Array(
+    Row("1901-01-01", -11.7, -9.0, -13.6, 2.2, 4, null),
+    Row("1901-01-02", -11.1, -10.0, -15.2, 3.0, 4, null),
+    Row("1901-01-03", -13.0, -10.0, -15.7, null, null, null),
+    Row("1955-01-01", -2.1, -1.0, -3.4, 2.5, 4, 0.6),
+    Row("1955-01-02", -2.3, -1.5, -3.1, 0.1, 4, 0.1),
+    Row("1955-01-03", -3.9, -2.0, -6.5, 5.3, 4, 0.0),
+    Row("2010-01-01", 5.0, 7.8, 3.6, null, null, 0.7),
+    Row("2010-01-02", 1.6, 5.8, 0.1, 0.1, 4, 1.4),
+    Row("2010-01-03", -1.9, 0.2, -2.6, 0.0, 4, 0.5)
+  )
+
+  val CLIMATE_TYPE = StructType(
+    StructField("observation_date", DateType, nullable = false) ::
+      StructField("mean_temperature", DoubleType, nullable = false) ::
+      StructField("max_temperature", DoubleType, nullable = false) ::
+      StructField("min_temperature", DoubleType, nullable = false) ::
+      StructField("precipitation_mm", DoubleType, nullable = true) ::
+      StructField("precipitation_type", IntegerType, nullable = true) ::
+      StructField("sunshine_hours", DoubleType, nullable = true) ::
+      Nil)
 
   override def afterAll() {
     sc.stop()
   }
 
-  describe("rdd") {
+  describe("dataframe") {
     describe("when reading from csv file") {
-      it("should have a list of strings") {
+      it("should have a list of Rows") {
         val actual = Homework.readCsvData(sqlContext, INPUT_BIDS_INTEGRATION)
-        val expected = CLIMATE_DATA
-        RddComparator.printListDiff(expected, actual.collect())
+        val expected = CLIMATE_DATAFRAME
+        RddComparator.printRowDiff(expected, actual.collect())
         assert(actual.collect() === expected)
       }
     }
 
     describe("when counting missing data") {
       it("should summarize them") {
-        val actual = Homework.findErrors(sc.parallelize(CLIMATE_DATA))
+        val actual = Homework.findErrors(sqlContext.createDataFrame(sc.parallelize(CLIMATE_DATAFRAME), CLIMATE_TYPE))
         val expected = List(0, 0, 0, 0, 2, 2, 3)
         assert(actual === expected)
       }
@@ -54,16 +76,16 @@ class HomeworkSpec extends FunSpec with BeforeAndAfterAll {
 
     describe("when checking temperature for a given day") {
       it("it should contain the temperatures for all observed dates") {
-        val actual = Homework.averageTemperature(sc.parallelize(CLIMATE_DATA), 1, 2)
-        val expected = Array(-11.1, -2.3, 1.6)
-        RddComparator.printAnyDiff(expected, actual.collect())
+        val actual = Homework.averageTemperature(sqlContext.createDataFrame(sc.parallelize(CLIMATE_DATAFRAME), CLIMATE_TYPE), 1, 2)
+        val expected = Array(Row(-11.1), Row(-2.3), Row(1.6))
+        RddComparator.printRowDiff(expected, actual.collect())
         assert(actual.collect() === expected)
       }
     }
 
     describe("when predicting temperature for a given day") {
       it("it should return a temperature based on all observed dates including previous and next days") {
-        val actual = Homework.predictTemperature(sc.parallelize(CLIMATE_DATA), 1, 2)
+        val actual = Homework.predictTemperature(sqlContext.createDataFrame(sc.parallelize(CLIMATE_DATAFRAME), CLIMATE_TYPE), 1, 2)
         val expected = -4.377777777777776
         assert(actual === expected)
       }

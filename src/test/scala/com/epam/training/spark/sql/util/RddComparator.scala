@@ -1,7 +1,7 @@
 package com.epam.hubd.spark.scala.core.util
 
-import com.epam.training.spark.sql.domain.Climate
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.Row
 
 object RddComparator {
   def printRddListDiff(expected: RDD[List[String]], actual: RDD[List[String]]) = {
@@ -13,6 +13,10 @@ object RddComparator {
     val actualArray = actual.collect
     val expectedArray = expected.collect
     printDiff(expectedArray, actualArray)
+  }
+
+  def printRowDiff(expectedArray: Array[Row], actualArray: Array[Row]) = {
+    printDiff(expectedArray.map(_.mkString(";")), actualArray.map(_.mkString(";")))
   }
 
   def printListDiff(expectedArray: Array[List[String]], actualArray: Array[List[String]]) = {
