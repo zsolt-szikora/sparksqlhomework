@@ -3,8 +3,7 @@ package com.epam.training.spark.sql
 import java.time.LocalDate
 
 import com.epam.hubd.spark.scala.core.util.RddComparator
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalactic.Tolerance._
 import org.scalatest.{BeforeAndAfterAll, FunSpec}
@@ -19,8 +18,10 @@ class HomeworkSpec extends FunSpec with BeforeAndAfterAll {
     .setAppName("EPAM BigData training Spark SQL homework test")
     .setIfMissing("spark.master", "local[2]")
     .setIfMissing("spark.sql.shuffle.partitions", "2")
-  val sc = new SparkContext(sparkConf)
-  val sqlContext = new HiveContext(sc)
+  val sparkSession : SparkSession = SparkSession.builder
+    .config(sparkConf)
+    .enableHiveSupport()
+    .getOrCreate
 
   val CLIMATE_DATA = List(
     Row("1901-01-01", "-11.7", "-9.0", "-13.6", "2.2", "4", ""),
@@ -47,13 +48,13 @@ class HomeworkSpec extends FunSpec with BeforeAndAfterAll {
   )
 
   override def afterAll() {
-    sc.stop()
+    sparkSession.stop()
   }
 
   describe("dataframe") {
     describe("when reading from csv file") {
       it("should have a list of Rows") {
-        val actual = Homework.readCsvData(sqlContext, INPUT_BIDS_INTEGRATION)
+        val actual = Homework.readCsvData(sparkSession, INPUT_BIDS_INTEGRATION)
         val expected = CLIMATE_DATAFRAME
         RddComparator.printRowDiff(expected.toArray, actual.collect())
         assert(actual.collect() === expected)
@@ -62,7 +63,7 @@ class HomeworkSpec extends FunSpec with BeforeAndAfterAll {
 
     describe("when counting missing data") {
       it("should summarize them") {
-        val actual = Homework.findErrors(sqlContext.createDataFrame(CLIMATE_DATAFRAME.asJava, Constants.CLIMATE_TYPE))
+        val actual = Homework.findErrors(sparkSession.createDataFrame(CLIMATE_DATAFRAME.asJava, Constants.CLIMATE_TYPE))
         val expected = Array(Row(0, 0, 0, 0, 2, 2, 3))
         assert(actual === expected)
       }
@@ -70,7 +71,7 @@ class HomeworkSpec extends FunSpec with BeforeAndAfterAll {
 
     describe("when checking temperature for a given day") {
       it("it should contain the temperatures for all observed dates") {
-        val actual = Homework.averageTemperature(sqlContext.createDataFrame(CLIMATE_DATAFRAME.asJava, Constants.CLIMATE_TYPE), 1, 2)
+        val actual = Homework.averageTemperature(sparkSession.createDataFrame(CLIMATE_DATAFRAME.asJava, Constants.CLIMATE_TYPE), 1, 2)
         val expected = Array(Row(-11.1), Row(-2.3), Row(1.6))
         RddComparator.printRowDiff(expected, actual.collect())
         assert(actual.collect() === expected)
@@ -79,7 +80,7 @@ class HomeworkSpec extends FunSpec with BeforeAndAfterAll {
 
     describe("when predicting temperature for a given day") {
       it("it should return a temperature based on all observed dates including previous and next days") {
-        val actual = Homework.predictTemperature(sqlContext.createDataFrame(CLIMATE_DATAFRAME.asJava, Constants.CLIMATE_TYPE), 1, 2)
+        val actual = Homework.predictTemperature(sparkSession.createDataFrame(CLIMATE_DATAFRAME.asJava, Constants.CLIMATE_TYPE), 1, 2)
         val expected = -4.377777777777776
         assert(actual === expected +- 0.0001)
       }

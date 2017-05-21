@@ -1,8 +1,7 @@
 package com.epam.training.spark.sql
 
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Homework {
@@ -15,23 +14,25 @@ object Homework {
       .setAppName("EPAM BigData training Spark SQL homework")
       .setIfMissing("spark.master", "local[2]")
       .setIfMissing("spark.sql.shuffle.partitions", "10")
-    val sc = new SparkContext(sparkConf)
-    val sqlContext = new HiveContext(sc)
+    val sparkSession = org.apache.spark.sql.SparkSession.builder
+      .config(sparkConf)
+      .enableHiveSupport()
+      .getOrCreate
 
-    processData(sqlContext)
+    processData(sparkSession)
 
-    sc.stop()
+    sparkSession.stop()
 
   }
 
-  def processData(sqlContext: HiveContext): Unit = {
+  def processData(sparkSession: SparkSession): Unit = {
 
     /**
       * Task 1
       * Read csv data with DataSource API from provided file
       * Hint: schema is in the Constants object
       */
-    val climateDataFrame: DataFrame = readCsvData(sqlContext, Homework.RAW_BUDAPEST_DATA)
+    val climateDataFrame: DataFrame = readCsvData(sparkSession, Homework.RAW_BUDAPEST_DATA)
 
     /**
       * Task 2
@@ -58,15 +59,48 @@ object Homework {
 
   }
 
-  def readCsvData(sqlContext: HiveContext, rawDataPath: String): DataFrame = ???
+  def readCsvData(sparkSession: SparkSession, rawDataPath: String): DataFrame = sparkSession.read
+    .format("csv")
+    .option("header", "true")
+    .option("delimiter", ";")
+    .schema(Constants.CLIMATE_TYPE)
+    .csv(rawDataPath)
 
-  def findErrors(climateDataFrame: DataFrame): Array[Row] = ???
+  def findErrors(climateDataFrame: DataFrame): Array[Row] = {
 
-  def averageTemperature(climateDataFrame: DataFrame, monthNumber: Int, dayOfMonth: Int): DataFrame = ???
+    def countNullValuesColumn(column: Column): Column =
+      count("*") - count(column)
 
-  def predictTemperature(climateDataFrame: DataFrame, monthNumber: Int, dayOfMonth: Int): Double = ???
+    def countNullValuesColumnArray: Array[Column] =
+      climateDataFrame
+        .columns
+        .map(colName => countNullValuesColumn(col(colName).alias("countOfNullsIn" + colName)))
 
+    climateDataFrame.select(countNullValuesColumnArray: _*).collect()
+  }
 
+  def averageTemperature(climateDataFrame: DataFrame, monthNumber: Int, dayOfMonth: Int): DataFrame = climateDataFrame
+    .filter(observedOnColumn(monthNumber, dayOfMonth))
+    .select("mean_temperature")
+
+  def predictTemperature(climateDataFrame: DataFrame, monthNumber: Int, dayOfMonth: Int): Double = climateDataFrame
+    .filter(observedOnPlusMinusOneDayColumn(monthNumber, dayOfMonth))
+    .select(avg(col("mean_temperature")))
+    .first()
+    .getDouble(0)
+
+  private val observedOnColumn = col("observation_date")
+  private val dayBeforeObserveColumn = date_sub(observedOnColumn, 1)
+  private val dayAfterObserveColumn = date_add(observedOnColumn, 1)
+
+  private def observedOnColumn(monthNumber: Int, dayOfMonth: Int) : Column =
+    (month(observedOnColumn) === monthNumber)
+      .&&(dayofmonth(observedOnColumn) === dayOfMonth)
+
+  private def observedOnPlusMinusOneDayColumn(monthNumber: Int, dayOfMonth: Int) : Column=
+    (month(observedOnColumn) === monthNumber && dayofmonth(observedOnColumn) === dayOfMonth)
+      .|| (month(dayBeforeObserveColumn) === monthNumber && dayofmonth(dayBeforeObserveColumn) === dayOfMonth)
+      .|| (month(dayAfterObserveColumn) === monthNumber && dayofmonth(dayAfterObserveColumn) === dayOfMonth)
 }
 
 
